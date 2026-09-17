@@ -1,44 +1,272 @@
 return {
-    "lervag/vimtex",
-    lazy = false,     -- we don't want to lazy load VimTeX
-    -- tag = "v2.15", -- uncomment to pin to a specific release
-    init = function()
-        vim.g.vimtex_compiler_latexmk = {
-            executable = "latexmk",
-            options = {
-                "-pdf",
-                "-interaction=nonstopmode",
-                "-synctex=1",
-                -- "-outdir=build", -- Redirects main output and PDF
-                "-auxdir=build", -- Redirects auxiliary files
-                "-file-line-error",
-                -- "%f"
+    -- LSP support
+    -- 'neovim/nvim-lspconfig',
+    -- Snippets
+    {
+        'L3MON4D3/LuaSnip',
+        build = "make install_jsregexp",
+        dependencies = { "rafamadriz/friendly-snippets" },
+        config = function ()
+            require("luasnip.loaders.from_vscode").lazy_load()
+        end
+    },
+    -- LSP
+    {
+        -- 'williamboman/mason-lspconfig.nvim',
+        'mason-org/mason-lspconfig.nvim',
+        dependencies = {
+            -- Language Servers management from neovim
+            -- 'williamboman/mason.nvim',
+            'mason-org/mason.nvim',
+            'neovim/nvim-lspconfig', -- Required for the specific server's config
+            -- 'williamboman/mason-lspconfig.nvim',
+            -- Autocompletion
+            'hrsh7th/cmp-nvim-lsp',
+            'hrsh7th/cmp-buffer',
+            'hrsh7th/cmp-path',
+            'hrsh7th/cmp-cmdline',
+            'hrsh7th/nvim-cmp',
+            'L3MON4D3/LuaSnip',
+            'saadparwaiz1/cmp_luasnip',
+            'j-hui/fidget.nvim',
+        },
+        opts = {
+            automatic_enable = false,
+            ensure_installed = {
+                'clangd',
+                'rust_analyzer',
+                'lua_ls',
+                'pyrefly',
+                'pylsp',
+                'texlab',
+                'ltex_plus',
             },
-        }
-        vim.g.vimtex_view_method = "zathura"
+        },
+        config = function(_, opts)
+            require('fidget').setup()
+            require('mason').setup()
+            require("mason-lspconfig").setup(opts)
 
-        vim.api.nvim_create_autocmd("FileType", {
-            pattern = "tex",
-            callback = function(ev)
-                vim.treesitter.stop(ev.buf, "latex")
-                -- Enable visual line wrapping
-                vim.opt_local.wrap = true
-                vim.opt_local.linebreak = true
+            local cmp = require('cmp')
+            local cmplsp = require('cmp_nvim_lsp')
+            local capabilities = vim.tbl_deep_extend(
+                'force',
+                {},
+                vim.lsp.protocol.make_client_capabilities(),
+                cmplsp.default_capabilities()
+            )
+            local luasnip = require('luasnip')
 
-                -- Prevent Neovim from inserting hard line breaks while you type
-                vim.opt_local.textwidth = 0
-                -- Remove 't' to stop automatic text wrapping
-                vim.opt_local.formatoptions:remove("t")
+            vim.cmd[[set completeopt+=menuone,noselect,popup]]
+            vim.lsp.config("*", { root_markers = { ".git", ".hg" }, capabilities = capabilities })
+            vim.lsp.config("lua_ls", {
+                settings = {
+                    Lua = {
+                        runtime = { version = "LuaJIT", },
+                        diagnostics = {
+                            globals = {
+                                'vim', 'it', 'describe',
+                                'before_each', 'after_each',
+                                'awesome',
+                            }
+                        }
+                    }
+                }
+            })
+            vim.lsp.config("clangd", {
+                cmd = { "clangd", "--compile-commands-dir=./build" },
+            })
+            vim.lsp.config("pyrefly", {
+                on_attach = function(client, _)
+                    client.server_capabilities.diagnosticProvider = false
+                    client.server_capabilities.documentSymbolProvider = false
+                end,
+            })
+            vim.lsp.config("pylsp", {
+                on_attach = function(client, _)
+                    client.server_capabilities.completionProvider = false
+                end,
+                settings = {
+                    pylsp = {
+                        plugins = {
+                            pycodestyle = {
+                                enabled = true,
+                                ignore = { "E501", "W391" },
+                                maxLineLength = 150,
+                            },
+                            pyflakes = { enabled = true, },
+                            mccabe = { threshold = 20, },
+                        }
+                    }
+                },
+            })
+            vim.lsp.config("texlab", {
+                settings = {
+                    texlab = {
+                        build = {
+                            -- args = {
+                            --     "-pdf",
+                            --     "-interaction=nonstopmode",
+                            --     "-synctex=1",
+                            --     -- "-outdir=build", -- Redirects main output and PDF
+                            --     "-auxdir=build", -- Redirects auxiliary files
+                            --     "%f"
+                            -- },
+                            onSave = false,
+                        }
+                    }
+                },
+            })
+            vim.lsp.config("ltex_plus", {
+                on_attach = function(client, _)
+                    client.server_capabilities.completionProvider = false
+                end,
+                cmd = { "ltex-ls-plus" },
+                filetypes = { "latex", "tex", "markdown" },
+                settings = {
+                    ltex = {
+                        language = "es-ES",
+                        dictionary = {
+                            ["es"] = {
+                                "height", "width", "depth",
+                                "VAR", "VAD", "VLM", "PCA",
+                                "ésima", "aprendibles", "precalculada",
+                                "Anomaly", "anomaly", "UCF", "UCA", "Crime"
+                            },
+                        },
+                        environments = {
+                            ["equation"] = "ignore"
+                        },
+                    },
+                },
+            })
 
-                -- The Magic Keymap: Instantly reformat a chopped paragraph 
-                -- Pressing 'gwip' will reflow your text back into a single continuous line, 
-                -- causing single line breaks to disappear and match standard viewer output.
-                vim.keymap.set("n", "<leader>mp", "gwip", { desc = "Reflow paragraph (Remove single line breaks)" })
-                -- Move per visual line instead of logic line
-                vim.keymap.set({ "n", "x" }, "j", "gj", { buffer = true, desc = "Move down per visual line" })
-                vim.keymap.set({ "n", "x" }, "k", "gk", { buffer = true, desc = "Move up per visual line" })
-            end,
-        })
-        vim.keymap.set({ "n", "x" }, "<leader>ca", vim.lsp.buf.code_action, { desc = "LSP: code action" })
-    end
+            -- local servers = {
+            --     'clangd',
+            --     'rust_analyzer',
+            --     'lua_ls',
+            --     'pyrefly',
+            --     'pylsp',
+            --     'texlab',
+            --     'ltex-ls-plus',
+            -- }
+
+            -- for _, server in ipairs(servers) do
+            for _, server in ipairs(opts.ensure_installed) do
+                vim.lsp.enable(server)
+            end
+
+            cmp.setup({
+                preselect = cmp.PreselectMode.None,
+                snippet = {
+                    -- REQUIRED - snippet engine
+                    expand = function(args)
+                        luasnip.lsp_expand(args.body)
+                    end,
+                },
+                window = {
+                    completion = cmp.config.window.bordered({
+                        border = "rounded",
+                        winhighlight = 'Normal:Pmenu,FloatBorder:Pmenu,CursorLine:PmenuSel,Search:None',
+                        side_padding = 0,
+                    }),
+                    documentation = cmp.config.window.bordered({
+                        border = "rounded",
+                        winhighlight = 'Normal:Pmenu,FloatBorder:Pmenu,CursorLine:PmenuSel,Search:None',
+                    }),
+                },
+                mapping = {
+                    ["<CR>"] = cmp.mapping(function(fallback)
+                        if cmp.visible() then
+                            if luasnip.expandable() then
+                                luasnip.expand()
+                            elseif cmp.get_selected_entry() then
+                                cmp.confirm({
+                                    -- select = false,
+                                    select = true,
+                                })
+                            else
+                                cmp.close()
+                                fallback()
+                            end
+                        else
+                            fallback()
+                        end
+                    end),
+
+                    ["<Tab>"] = cmp.mapping(function(fallback)
+                        if cmp.visible() then
+                            cmp.select_next_item()
+                        elseif luasnip.locally_jumpable(1) then
+                            luasnip.jump(1)
+                        else
+                            fallback()
+                        end
+                    end, { "i", "s" }),
+
+                    ["<S-Tab>"] = cmp.mapping(function(fallback)
+                        if cmp.visible() then
+                            cmp.select_prev_item()
+                        elseif luasnip.locally_jumpable(-1) then
+                            luasnip.jump(-1)
+                        else
+                            fallback()
+                        end
+                    end, { "i", "s" }),
+
+                    ["<C-Tab>"] = cmp.mapping(function(fallback)
+                        if cmp.visible() and cmp.get_selected_entry() then
+                            cmp.abort()
+                        else
+                            fallback()
+                        end
+                    end, { "i", "s" }),
+                },
+
+                -- sources = cmp.config.sources({
+                --     { name = 'nvim_lsp' },
+                --     { name = 'luasnip' }, -- For luasnip users.
+                -- }, {
+                --     { name = 'buffer' },
+                -- })
+                sources = {
+                    { name = "nvim_lsp" },
+                    { name = 'luasnip' }, -- For luasnip users.
+                    { name = 'buffer' },
+                },
+                formatting = {
+                    fields = { "abbr", "kind", "menu" },
+                    format = function(entry, vim_item)
+                        local source_names = {
+                            nvim_lsp = "[LSP]",
+                            luasnip = "[Snippet]",
+                            buffer = "[Buffer]",
+                            path = "[Path]",
+                            cmdline = "[Cmd]",
+                        }
+                        vim_item.menu = source_names[entry.source.name] or string.format("[%s]", entry.source.name)
+                        return vim_item
+                    end,
+                },
+            })
+
+            -- Use buffer source for `/` and `?` (if you enabled `native_menu`, this won't work anymore).
+            cmp.setup.cmdline({ '/', '?' }, {
+                mapping = cmp.mapping.preset.cmdline(),
+                sources = {
+                    { name = 'buffer' }
+                }
+            })
+
+            -- Use cmdline & path source for ':' (if you enabled `native_menu`, this won't work anymore).
+            cmp.setup.cmdline(':', {
+                mapping = cmp.mapping.preset.cmdline(),
+                sources = cmp.config.sources({
+                    { name = 'path' }
+                }, {
+                    { name = 'cmdline' }
+                })
+            })
+        end,
+    }
 }
