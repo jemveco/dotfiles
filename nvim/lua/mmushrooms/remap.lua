@@ -1,6 +1,7 @@
 vim.g.mapleader = " "
+vim.g.maplocalleader = ","
 
-vim.keymap.set("n", "<C-t>", vim.cmd.Ex)
+-- vim.keymap.set("n", "<C-t>", vim.cmd.Ex)
 
 vim.keymap.set("v", "J", ":m '>+1<CR>gv=gv")
 vim.keymap.set("v", "K", ":m '<-2<CR>gv=gv")
@@ -39,7 +40,8 @@ vim.keymap.set("n", "<C-j>", "<cmd>cprev<CR>zz")
 vim.keymap.set("n", "<leader>k", "<cmd>lnext<CR>zz")
 vim.keymap.set("n", "<leader>j", "<cmd>lprev<CR>zz")
 
-vim.keymap.set("n", "<leader>s", [[:%s/\<<C-r><C-w>\>/<C-r><C-w>/gI<Left><Left><Left>]])
+-- vim.keymap.set("n", "<leader>s", [[:%s#\<<C-r><C-w>\>/<C-r><C-w>/gI<Left><Left><Left>]])
+vim.keymap.set("n", "<leader>s", [[:%s/\V<C-r><C-w>/NUEVO_TEXTO/gI<Left><Left><Left>]])
 vim.keymap.set("n", "<leader>x", "<cmd>!chmod +x %<CR>", { silent = true })
 
 vim.keymap.set("n", "<leader>mr", "<cmd>CellularAutomaton make_it_rain<CR>")
@@ -49,6 +51,26 @@ vim.keymap.set("n", "<leader>cs", '<cmd>let @/=""<CR>')
 vim.keymap.set("n", "<leader><leader>", function()
     vim.cmd("so")
 end)
+
+vim.keymap.set({'n', 'v'}, "b", function()
+    local current_line = vim.fn.line(".")
+    vim.cmd("normal! b")
+    if vim.fn.line('.') ~= current_line then
+        vim.cmd.normal({ "j0", bang = true})
+    end
+end, { desc = "Move to previous word without wrapping lines" })
+
+vim.keymap.set({'n', 'v'}, 'w', function()
+    local current_line = vim.fn.line('.')
+    vim.cmd.normal({ 'w', bang = true })
+    if vim.fn.line('.') ~= current_line then
+        if vim.api.nvim_get_mode().mode == 'v' then
+            vim.cmd.normal({ 'k$h', bang = true })
+        else
+            vim.cmd.normal({ 'k$', bang = true })
+        end
+    end
+end, { desc = "Move to next word without wrapping lines" })
 
 -- {
 -- On LSP attach
